@@ -8,6 +8,8 @@
 import CDNS_SD
 import Foundation
 
+let timerInterval = TimeInterval(0.25)
+
 /// Swift implementation of the ZeroConf NetService API
 open class SwiftNetService {
     /// Delegate receiving resolution, monitoring, or publishing events.
@@ -36,6 +38,34 @@ open class SwiftNetService {
     /// Pointer to the underlying DNS service
     var sd: DNSServiceRef?
 
+    /// Runloop to run on
+    var runLoop: RunLoop?
+
+    /// Runloop mode to run in
+    var runLoopMode = RunLoopMode.defaultRunLoopMode
+
+    /// Timer associated with the service
+    var timer: Timer! {
+        get {
+            if _timer == nil {
+                weak var weakSelf: SwiftNetService? = self
+                _timer = Timer(fire: Date(timeIntervalSinceNow: timerInterval), interval: timerInterval, repeats: false) {
+                    guard let this = weakSelf else {
+                        $0.invalidate()
+                        return
+                    }
+                    this.fire($0)
+                }
+            }
+            return _timer
+        }
+        set { _timer = newValue }
+    }
+    var _timer: Timer?
+
+    /// Last DNSService error received
+    var lastError = Int(kDNSServiceErr_NoError)
+
     /// Designated intialiser for publishing the availability of a service
     /// on the network.
     ///
@@ -51,21 +81,55 @@ open class SwiftNetService {
         _port = Int(port)
     }
 
+    open func schedule(in aRunLoop: RunLoop, forMode mode: RunLoopMode = .defaultRunLoopMode) {
+        runLoop = aRunLoop
+        runLoopMode = mode
+        _ = timer               // make sure timer is set up
+    }
+
+    open func remove(from aRunLoop: RunLoop, forMode mode: RunLoopMode = .defaultRunLoopMode) {
+        if let timer = _timer {
+            _timer = nil
+            timer.fireDate = Date()
+            timer.invalidate()
+        }
+        runLoop = nil
+    }
+
+    /// Timer callback
+    ///
+    /// - Parameter timer: the timer that fired
+    func fire(_ timer: Timer) {
+        guard let sd = sd else {
+            return
+        }
+        let fd = DNSServiceRefSockFD(sd)
+        guard fd >= 0 else {
+            return
+        }
+        let ev = Int16(POLLIN)
+        var pollFD = pollfd(fd: fd, events: ev, revents: 0)
+        guard poll(&pollFD, 1, 0) > 0 else {
+            return
+        }
+        lastError = Int(DNSServiceProcessResult(sd))
+    }
+
     /// Publish the net service.  This function returns immediately.
     ///
     /// - Parameter options: publishing options
     open func publish(options: SwiftNetService.Options = []) {
         let this = Unmanaged.passRetained(self).toOpaque()
         let port = UInt16(_port < 0 ? 0 : _port).bigEndian
-        let rv = DNSServiceRegister(&sd, 0, 0, _name, _type, _domain, nil, port, 0, nil, { (sdRef: DNSServiceRef?, flags: DNSServiceFlags, err: DNSServiceErrorType, name: UnsafePointer<Int8>?, regType: UnsafePointer<Int8>?, domain: UnsafePointer<Int8>?, context: UnsafeMutableRawPointer?) in
+        lastError = Int(DNSServiceRegister(&sd, 0, 0, _name, _type, _domain, nil, port, 0, nil, { (sdRef: DNSServiceRef?, flags: DNSServiceFlags, err: DNSServiceErrorType, name: UnsafePointer<Int8>?, regType: UnsafePointer<Int8>?, domain: UnsafePointer<Int8>?, context: UnsafeMutableRawPointer?) in
             guard let context = context else { fatalError("DNSServiceRegister callback without context") }
             let this = Unmanaged<SwiftNetService>.fromOpaque(context).takeRetainedValue()
             if let name = name, let n = String(validatingUTF8: name) { this._name = n }
             if let type = regType, let t = String(validatingUTF8: type) { this._type = t }
             if let domain = domain, let d = String(validatingUTF8: domain) { this._domain = d }
-        }, this)
-        if Int(rv) != kDNSServiceErr_NoError {
-            print("Error \(rv) registering service '\(name)' of type '\(type)' in domain '\(domain)'")
+        }, this))
+        if lastError != kDNSServiceErr_NoError {
+            print("Error \(lastError) registering service '\(name)' of type '\(type)' in domain '\(domain)'")
         }
     }
 
