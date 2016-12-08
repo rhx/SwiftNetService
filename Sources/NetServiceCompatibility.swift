@@ -7,7 +7,7 @@
 //
 
 /// ZeroConf NetService API
-public typealias xNetService = SwiftNetService
+public typealias NetService = SwiftNetService
 
 /// Callback Delegate
 public typealias NetServiceDelegate = SwiftNetServiceDelegate
