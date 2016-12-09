@@ -23,7 +23,7 @@ public protocol SwiftNetServiceDelegate: class {
     /// - Parameters:
     ///   - sender: `NetService` instance invoking this callback
     ///   - errorDict: dictionary containing the corresponding error information
-    func netService(_ sender: NetService, didNotPublish errorDict: [String : NSNumber])
+    func netService(_ sender: NetService, didNotPublish errorDict: SwiftNetService.ErrorDictionary)
 
     /// Function that gets called when the netservice is about to resolve a service
     ///
@@ -40,7 +40,7 @@ public protocol SwiftNetServiceDelegate: class {
     /// - Parameters:
     ///   - sender: `NetService` instance invoking this callback
     ///   - errorDict: dictionary containing the corresponding error information
-    func netService(_ sender: NetService, didNotResolve errorDict: [String : NSNumber])
+    func netService(_ sender: NetService, didNotResolve errorDict: SwiftNetService.ErrorDictionary)
 
     /// Function that gets called when the netservice has stopped
     ///
@@ -63,10 +63,10 @@ public protocol SwiftNetServiceDelegate: class {
 public extension SwiftNetServiceDelegate {
     func netServiceWillPublish(_ sender: NetService) {}
     func netServiceDidPublish(_ sender: NetService) {}
-    func netService(_ sender: NetService, didNotPublish errorDict: [String : NSNumber]) {}
+    func netService(_ sender: NetService, didNotPublish errorDict: SwiftNetService.ErrorDictionary) {}
     func netServiceWillResolve(_ sender: NetService) {}
     func netServiceDidResolveAddress(_ sender: NetService) {}
-    func netService(_ sender: NetService, didNotResolve errorDict: [String : NSNumber]) {}
+    func netService(_ sender: NetService, didNotResolve errorDict: SwiftNetService.ErrorDictionary) {}
     func netServiceDidStop(_ sender: NetService) {}
     func netService(_ sender: NetService, didUpdateTXTRecord data: Data) {}
     func netService(_ sender: NetService, didAcceptConnectionWith inputStream: InputStream, outputStream: OutputStream) {}
