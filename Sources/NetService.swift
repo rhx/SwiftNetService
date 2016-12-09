@@ -27,6 +27,9 @@ open class SwiftNetService {
     open var domain: String { return _domain }
     var _domain: String
 
+    /// Name of the computer hosting the service
+    open var hostName: String?
+
     /// Port associated with the resolved service or `-1` if not resolved yet.
     open var port: Int { return _port }
     var _port: Int
@@ -49,7 +52,7 @@ open class SwiftNetService {
         get {
             if _timer == nil {
                 weak var weakSelf: SwiftNetService? = self
-                _timer = Timer(fire: Date(timeIntervalSinceNow: timerInterval), interval: timerInterval, repeats: false) {
+                _timer = Timer(fire: Date(timeIntervalSinceNow: timerInterval), interval: timerInterval, repeats: true) {
                     guard let this = weakSelf else {
                         $0.invalidate()
                         return
@@ -66,6 +69,11 @@ open class SwiftNetService {
     /// Last DNSService error received
     var lastError = Int(kDNSServiceErr_NoError)
 
+    /// Error dictionary associated with the last error
+    var errorDictionary: [String : NSNumber] {
+        return [:]
+    }
+
     /// Designated intialiser for publishing the availability of a service
     /// on the network.
     ///
@@ -79,6 +87,13 @@ open class SwiftNetService {
         _type = type
         _name = name
         _port = Int(port)
+    }
+
+    /// Deallocate service ref
+    deinit {
+        if let sd = sd {
+            DNSServiceRefDeallocate(sd)
+        }
     }
 
     open func schedule(in aRunLoop: RunLoop, forMode mode: RunLoopMode = .defaultRunLoopMode) {
@@ -127,9 +142,16 @@ open class SwiftNetService {
             if let name = name, let n = String(validatingUTF8: name) { this._name = n }
             if let type = regType, let t = String(validatingUTF8: type) { this._type = t }
             if let domain = domain, let d = String(validatingUTF8: domain) { this._domain = d }
+            this.lastError = Int(err)
+            guard this.lastError == kDNSServiceErr_NoError else {
+                this.delegate?.netService(this, didNotPublish: this.errorDictionary)
+                return
+            }
+            this.delegate?.netServiceDidPublish(this)
         }, this))
-        if lastError != kDNSServiceErr_NoError {
-            print("Error \(lastError) registering service '\(name)' of type '\(type)' in domain '\(domain)'")
+        guard lastError == kDNSServiceErr_NoError else {
+            delegate?.netService(self, didNotPublish: errorDictionary)
+            return
         }
     }
 
@@ -155,4 +177,44 @@ open class SwiftNetService {
             return Options(rawValue: 1 << 0)
         }
     }
+
+    /// Start a service resolution with a given timeout
+    ///
+    /// - Parameter timeout: maximum duration of the service resolution
+    open func resolve(withTimeout timeout: TimeInterval = 5) {
+        let this = Unmanaged.passRetained(self).toOpaque()
+        lastError = Int(DNSServiceResolve(&sd, 0, 0, _name, _type, _domain, { (sdRef: DNSServiceRef?, flags: DNSServiceFlags, interfaceIndex: UInt32, err: DNSServiceErrorType, name: UnsafePointer<Int8>?, host: UnsafePointer<Int8>?, port: UInt16, len: UInt16, txt: UnsafePointer<UInt8>?, context: UnsafeMutableRawPointer?) in
+            guard let context = context else { fatalError("DNSServiceResolve callback without context") }
+            let this = Unmanaged<SwiftNetService>.fromOpaque(context).takeRetainedValue()
+            if let name = name, let n = String(validatingUTF8: name) { this._name = n }
+            if let host = host, let h = String(validatingUTF8: host) { this.hostName = h }
+            this.lastError = Int(err)
+            guard this.lastError == kDNSServiceErr_NoError else {
+                this.delegate?.netService(this, didNotResolve: this.errorDictionary)
+                return
+            }
+            this.delegate?.netServiceDidResolveAddress(this)
+        }, this))
+        guard lastError == kDNSServiceErr_NoError else {
+            delegate?.netService(self, didNotResolve: errorDictionary)
+            return
+        }
+        weak var weakSelf: SwiftNetService? = self
+        _ = Timer(fire: Date(timeIntervalSinceNow: timeout), interval: timeout, repeats: false) {
+            guard let this = weakSelf else {
+                $0.invalidate()
+                return
+            }
+            if let sd = this.sd {
+                DNSServiceRefDeallocate(sd)
+                this.sd = nil
+            }
+            this.delegate?.netService(self, didNotResolve: [:])
+        }
+    }
+
+    /// Net services error code dictionary key
+    open static let errorCode = "NSNetServicesErrorCode"
+    /// Net services error domain dictionary key
+    open static let errorDomain = "NSNetServicesErrorDomain"
 }
