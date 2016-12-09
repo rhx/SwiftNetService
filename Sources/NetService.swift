@@ -134,6 +134,10 @@ open class SwiftNetService {
     ///
     /// - Parameter options: publishing options
     open func publish(options: SwiftNetService.Options = []) {
+        if let sd = sd {
+            DNSServiceRefDeallocate(sd)
+            self.sd = nil
+        }
         let this = Unmanaged.passRetained(self).toOpaque()
         let port = UInt16(_port < 0 ? 0 : _port).bigEndian
         lastError = Int(DNSServiceRegister(&sd, 0, 0, _name, _type, _domain, nil, port, 0, nil, { (sdRef: DNSServiceRef?, flags: DNSServiceFlags, err: DNSServiceErrorType, name: UnsafePointer<Int8>?, regType: UnsafePointer<Int8>?, domain: UnsafePointer<Int8>?, context: UnsafeMutableRawPointer?) in
@@ -182,6 +186,10 @@ open class SwiftNetService {
     ///
     /// - Parameter timeout: maximum duration of the service resolution
     open func resolve(withTimeout timeout: TimeInterval = 5) {
+        if let sd = sd {
+            DNSServiceRefDeallocate(sd)
+            self.sd = nil
+        }
         let this = Unmanaged.passRetained(self).toOpaque()
         lastError = Int(DNSServiceResolve(&sd, 0, 0, _name, _type, _domain, { (sdRef: DNSServiceRef?, flags: DNSServiceFlags, interfaceIndex: UInt32, err: DNSServiceErrorType, name: UnsafePointer<Int8>?, host: UnsafePointer<Int8>?, port: UInt16, len: UInt16, txt: UnsafePointer<UInt8>?, context: UnsafeMutableRawPointer?) in
             guard let context = context else { fatalError("DNSServiceResolve callback without context") }
