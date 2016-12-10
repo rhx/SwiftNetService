@@ -10,6 +10,15 @@
 import CoreFoundation
 import Foundation
 
+#if os(Linux)
+    private let utf8 = CFStringEncoding(kCFStringEncodingUTF8)
+    private func CFStreamPropertyKey(rawValue: CFString) -> CFString {
+        return rawValue
+    }
+#else
+    private let utf8 = CFStringBuiltInEncodings.UTF8.rawValue
+#endif
+
 public class DNSSDNetServiceInputStream: InputStream {
     var cfStream: CFReadStream
 
@@ -49,7 +58,17 @@ public class DNSSDNetServiceInputStream: InputStream {
 
 
 public class DNSSDNetServiceOutputStream: OutputStream {
-    var cfStream: CFWriteStream
+    var cfStream: CFWriteStream!
+
+    #if os(Linux)
+        public typealias PropertyValue = AnyObject
+
+        public required init(toMemory: ()) {
+            super.init(toMemory: ())
+        }
+    #else
+        public typealias PropertyValue = Any
+    #endif
 
     public init(_ stream: CFWriteStream) {
         cfStream = stream
@@ -80,21 +99,21 @@ public class DNSSDNetServiceOutputStream: OutputStream {
         return Stream.Status(rawValue: unsafeBitCast(status, to: UInt.self))!
     }
 
-    public override func property(forKey key: PropertyKey) -> Any? {
+    public override func property(forKey key: PropertyKey) -> PropertyValue? {
         return key.rawValue.withCString {
-            guard let k = CFStringCreateWithCString(kCFAllocatorDefault, $0, CFStringBuiltInEncodings.UTF8.rawValue) else {
+            guard let k = CFStringCreateWithCString(kCFAllocatorDefault, $0, utf8) else {
                 return nil
             }
             return CFWriteStreamCopyProperty(cfStream, CFStreamPropertyKey(rawValue: k))
         }
     }
 
-    public override func setProperty(_ property: Any?, forKey key: PropertyKey) -> Bool {
+    public override func setProperty(_ property: PropertyValue?, forKey key: PropertyKey) -> Bool {
         return key.rawValue.withCString {
-            guard let k = CFStringCreateWithCString(kCFAllocatorDefault, $0, CFStringBuiltInEncodings.UTF8.rawValue) else {
+            guard let k = CFStringCreateWithCString(kCFAllocatorDefault, $0, utf8) else {
                 return false
             }
-            return CFWriteStreamSetProperty(cfStream, CFStreamPropertyKey(rawValue: k), property as AnyObject)
+            return CFWriteStreamSetProperty(cfStream, CFStreamPropertyKey(rawValue: k), property as AnyObject?)
         }
     }
 }

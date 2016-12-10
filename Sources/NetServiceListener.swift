@@ -8,6 +8,14 @@
 import CoreFoundation
 import Foundation
 
+#if os(Linux)
+    extension CFSocketCallBackType {
+        static var acceptCallBack: CFSocketCallBackType {
+            return CFSocketCallBackType(kCFSocketAcceptCallBack)
+        }
+    }
+#endif
+
 private func createSockaddr4(_ port: UInt16) -> sockaddr_in {
     #if os(Linux)
         return sockaddr_in(sin_family: sa_family_t(AF_INET), sin_port: port, sin_addr: in_addr(s_addr: INADDR_ANY), sin_zero: (0,0,0,0,0,0,0,0))
@@ -55,7 +63,15 @@ extension DNSSDNetService {
             guard let this = $0 else { return }
             Unmanaged<DNSSDNetService>.fromOpaque(this).release()
         }, copyDescription: nil)
-        guard let v4socket = CFSocketCreate(kCFAllocatorDefault, PF_INET,  SOCK_STREAM, IPPROTO_TCP, CFSocketCallBackType.acceptCallBack.rawValue, callback, &context) else {
+        let tcp = Int32(IPPROTO_TCP)
+        #if os(Linux)
+            let stream = Int32(SOCK_STREAM.rawValue)
+            let accept = CFOptionFlags(kCFSocketAcceptCallBack)
+        #else
+            let stream = Int32(SOCK_STREAM)
+            let accept = CFOptionFlags(CFSocketCallBackType.acceptCallBack.rawValue)
+        #endif
+        guard let v4socket = CFSocketCreate(kCFAllocatorDefault, PF_INET,  stream, tcp, accept, callback, &context) else {
             cancel(domain: NSPOSIXErrorDomain, error: errno)
             return
         }
@@ -68,7 +84,7 @@ extension DNSSDNetService {
                 CFSocketSetAddress(v4socket, ip4data)
             }
         }
-        if let v6socket = CFSocketCreate(kCFAllocatorDefault, PF_INET6, SOCK_STREAM, IPPROTO_TCP, CFSocketCallBackType.acceptCallBack.rawValue, callback, &context) {
+        if let v6socket = CFSocketCreate(kCFAllocatorDefault, PF_INET6, stream, tcp, accept, callback, &context) {
             ipv6Socket = v6socket
             var ip6addr = createSockaddr6(ip4addr.sin_port)
             withUnsafeMutablePointer(to: &ip6addr) {
@@ -91,13 +107,18 @@ extension DNSSDNetService {
 
     func addSocketsToRunLoop() {
         guard let runLoop = runLoop?.getCFRunLoop() else { return }
+        #if os(Linux)
+            let mode = kCFRunLoopCommonModes
+        #else
+            let mode = CFRunLoopMode.commonModes!
+        #endif
         if let ipv4Socket = ipv4Socket {
             let source = CFSocketCreateRunLoopSource(kCFAllocatorDefault, ipv4Socket, 0);
-            CFRunLoopAddSource(runLoop, source, .defaultMode)
+            CFRunLoopAddSource(runLoop, source, mode)
         }
         if let ipv6Socket = ipv6Socket {
             let source = CFSocketCreateRunLoopSource(kCFAllocatorDefault, ipv6Socket, 0);
-            CFRunLoopAddSource(runLoop, source, .defaultMode)
+            CFRunLoopAddSource(runLoop, source, mode)
         }
     }
 

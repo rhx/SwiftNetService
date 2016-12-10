@@ -45,7 +45,7 @@ class NetServiceTests: XCTestCase, DNSSDNetServiceDelegate {
         service.delegate = self
         service.publish(options: [.listenForConnections])
         DispatchQueue.global().async {
-            _ = NSData(contentsOf: URL(string: "http://\(n):\(p)/")!)
+            _ = try! NSData(contentsOf: URL(string: "http://\(n):\(p)/")!)
         }
         RunLoop.current.run(until: Date(timeIntervalSinceNow: 1))
         XCTAssertEqual(service.port, p)
