@@ -6,6 +6,7 @@
 //  Copyright © 2016 René Hexel.  All rights reserved.
 //
 import CDNS_SD
+import CoreFoundation
 import Foundation
 
 let timerInterval = TimeInterval(0.25)
@@ -42,6 +43,9 @@ open class DNSSDNetService {
 
     /// The service is currently publishing
     var isPublishing = false
+
+    /// Should listen for connections
+    var shouldListen = false
 
     /// Addresses associated with the service returned as an
     /// array of Data containing a single `sockaddr` each.
@@ -90,6 +94,12 @@ open class DNSSDNetService {
         return [:]
     }
 
+    /// Listening socket for IPv4
+    var ipv4Socket: CFSocket?
+
+    /// Listening socket for IPv6
+    var ipv6Socket: CFSocket?
+
     /// Designated intialiser for publishing the availability of a service
     /// on the network.
     ///
@@ -110,6 +120,7 @@ open class DNSSDNetService {
         if let sd = sd {
             DNSServiceRefDeallocate(sd)
         }
+        invaldidateSockets()
     }
 
     /// Return the TXT record associated with the net service
@@ -134,7 +145,7 @@ open class DNSSDNetService {
     open func schedule(in aRunLoop: RunLoop, forMode mode: RunLoopMode = .defaultRunLoopMode) {
         runLoop = aRunLoop
         runLoopMode = mode
-        startMonitoring()
+        addSocketsToRunLoop()
     }
 
     /// Remove the net service from the given run loop
@@ -143,7 +154,6 @@ open class DNSSDNetService {
     ///   - aRunLoop: run loop to remove the net service from
     ///   - mode: run loop mode
     open func remove(from aRunLoop: RunLoop, forMode mode: RunLoopMode = .defaultRunLoopMode) {
-        stopMonitoring()
         runLoop = nil
     }
 
@@ -202,6 +212,9 @@ open class DNSSDNetService {
         }
         isPublishing = true
         delegate?.netServiceWillPublish(self)
+        if options.contains(.listenForConnections) {
+            listenForConnections()
+        }
     }
 
     /// Netservice publishing options.
@@ -271,12 +284,21 @@ open class DNSSDNetService {
 
     /// Halt a service that is publishing or resolving
     open func stop() {
+        cancel()
+    }
+
+    /// Cancel a current connection or publishing attempt, reporting an error
+    ///
+    /// - Parameters:
+    ///   - domain: error domain
+    ///   - error: error code
+    func cancel(domain: String = DNSSDNetService.netServiceErrorDomain, error: Any = DNSSDNetService.ErrorCode.cancelledError) {
         if let sd = sd {
             DNSServiceRefDeallocate(sd)
             self.sd = nil
             let dict: DNSSDNetService.ErrorDictionary = [
-                DNSSDNetService.errorDomain : DNSSDNetService.netServiceErrorDomain,
-                DNSSDNetService.errorCode   : DNSSDNetService.ErrorCode.cancelledError
+                DNSSDNetService.errorDomain : domain,
+                DNSSDNetService.errorCode   : error
             ]
             if isResolving {
                 isResolving = false
