@@ -7,7 +7,7 @@
 //
 import Foundation
 
-public protocol SwiftNetServiceDelegate: class {
+public protocol DNSSDNetServiceDelegate: class {
     /// Function that gets called when the netservice is about to publish a service
     ///
     /// - Parameter sender: `NetService` instance invoking this callback
@@ -23,7 +23,7 @@ public protocol SwiftNetServiceDelegate: class {
     /// - Parameters:
     ///   - sender: `NetService` instance invoking this callback
     ///   - errorDict: dictionary containing the corresponding error information
-    func netService(_ sender: NetService, didNotPublish errorDict: SwiftNetService.ErrorDictionary)
+    func netService(_ sender: NetService, didNotPublish errorDict: DNSSDNetService.ErrorDictionary)
 
     /// Function that gets called when the netservice is about to resolve a service
     ///
@@ -40,7 +40,7 @@ public protocol SwiftNetServiceDelegate: class {
     /// - Parameters:
     ///   - sender: `NetService` instance invoking this callback
     ///   - errorDict: dictionary containing the corresponding error information
-    func netService(_ sender: NetService, didNotResolve errorDict: SwiftNetService.ErrorDictionary)
+    func netService(_ sender: NetService, didNotResolve errorDict: DNSSDNetService.ErrorDictionary)
 
     /// Function that gets called when the netservice has stopped
     ///
@@ -59,14 +59,14 @@ public protocol SwiftNetServiceDelegate: class {
     func netService(_ sender: NetService, didAcceptConnectionWith inputStream: InputStream, outputStream: OutputStream)
 }
 
-/// Default implementations for the SwiftNetServiceDelegate callback functions
-public extension SwiftNetServiceDelegate {
+/// Default implementations for the DNSSDNetServiceDelegate callback functions
+public extension DNSSDNetServiceDelegate {
     func netServiceWillPublish(_ sender: NetService) {}
     func netServiceDidPublish(_ sender: NetService) {}
-    func netService(_ sender: NetService, didNotPublish errorDict: SwiftNetService.ErrorDictionary) {}
+    func netService(_ sender: NetService, didNotPublish errorDict: DNSSDNetService.ErrorDictionary) {}
     func netServiceWillResolve(_ sender: NetService) {}
     func netServiceDidResolveAddress(_ sender: NetService) {}
-    func netService(_ sender: NetService, didNotResolve errorDict: SwiftNetService.ErrorDictionary) {}
+    func netService(_ sender: NetService, didNotResolve errorDict: DNSSDNetService.ErrorDictionary) {}
     func netServiceDidStop(_ sender: NetService) {}
     func netService(_ sender: NetService, didUpdateTXTRecord data: Data) {}
     func netService(_ sender: NetService, didAcceptConnectionWith inputStream: InputStream, outputStream: OutputStream) {}

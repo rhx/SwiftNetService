@@ -8,7 +8,7 @@ class NetServiceTests: XCTestCase {
         let d = ""
         let t = "_test._tcp"
         let n = "TestMachine"
-        let service = SwiftNetService(domain: d, type: t, name: n, port: Int32(p))
+        let service = DNSSDNetService(domain: d, type: t, name: n, port: Int32(p))
         XCTAssertEqual(service.port, p)
         XCTAssertEqual(service.domain, d)
         XCTAssertEqual(service.type, t)
@@ -21,7 +21,7 @@ class NetServiceTests: XCTestCase {
         let d = "local."
         let t = "_test._tcp."
         let n = "TestMachine"
-        let service = SwiftNetService(domain: d, type: t, name: n, port: Int32(p))
+        let service = DNSSDNetService(domain: d, type: t, name: n, port: Int32(p))
         service.schedule(in: RunLoop.current)
         service.publish()
         RunLoop.current.run(until: Date(timeIntervalSinceNow: 2))
