@@ -29,12 +29,11 @@ import Foundation
                 return CFSocketError(kCFSocketError)
         }
         let sock = CFSocketGetNative(s)
-        return CFDataGetBytePtr(address).withMemoryRebound(to: sockaddr.self, capacity: 1) { (addr: UnsafePointer<sockaddr>!) -> CFSocketError in
-            guard addr != nil else { return CFSocketError(kCFSocketError) }
-            guard bind(sock, addr, len) == 0,
-                  listen(sock, 256) == 0 else { return CFSocketError(errno) }
-            return CFSocketError(kCFSocketSuccess)
-        }
+        guard let a = CFDataGetBytePtr(address) else { return CFSocketError(kCFSocketError) }
+        let addr = UnsafeRawPointer(a).assumingMemoryBound(to: sockaddr.self)
+        guard bind(sock, addr, len) == 0,
+            listen(sock, 256) == 0 else { return CFSocketError(errno) }
+        return CFSocketError(kCFSocketSuccess)
     }
 #else
     private let utf8 = CFStringBuiltInEncodings.UTF8.rawValue
@@ -110,6 +109,7 @@ public class DNSSDNetServiceOutputStream: OutputStream {
         public typealias PropertyValue = AnyObject
 
         public required init(toMemory: ()) {
+            sock = -1
             super.init(toMemory: ())
         }
     #else
