@@ -13,28 +13,6 @@ import Foundation
     private func CFStreamPropertyKey(rawValue: CFString) -> CFString {
         return rawValue
     }
-
-    /// Set bind the given socket to the given address and listen for connections
-    ///
-    /// - Parameters:
-    ///   - s: `CFSocket` to bind
-    ///   - address: IP address to bind to (Data containing a `struct sockaddr*`)
-    /// - Returns: `0` if successful, an error code otherwise
-    @discardableResult
-    func CFSocketSetAddress(_ s: CFSocket, _ address: CFData!) -> CFSocketError {
-        let len = socklen_t(CFDataGetLength(address))
-        guard address != nil,
-              len >= socklen_t(MemoryLayout<sockaddr_in>.size),
-              CFSocketIsValid(s) else {
-                return CFSocketError(kCFSocketError)
-        }
-        let sock = CFSocketGetNative(s)
-        guard let a = CFDataGetBytePtr(address) else { return CFSocketError(kCFSocketError) }
-        let addr = UnsafeRawPointer(a).assumingMemoryBound(to: sockaddr.self)
-        guard bind(sock, addr, len) == 0,
-            listen(sock, 256) == 0 else { return CFSocketError(errno) }
-        return CFSocketError(kCFSocketSuccess)
-    }
 #else
     private let utf8 = CFStringBuiltInEncodings.UTF8.rawValue
 #endif
