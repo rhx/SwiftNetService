@@ -35,6 +35,20 @@ import Foundation
             listen(sock, 256) == 0 else { return CFSocketError(errno) }
         return CFSocketError(kCFSocketSuccess)
     }
+
+    public extension InputStream {
+        public var _stream: CFReadStream! {
+            get { return nil }
+            set { }
+        }
+    }
+
+    public extension OutputStream {
+        public var _stream: CFWriteStream! {
+            get { return nil }
+            set { }
+        }
+    }
 #else
     private let utf8 = CFStringBuiltInEncodings.UTF8.rawValue
 #endif
