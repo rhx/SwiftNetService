@@ -186,6 +186,35 @@ open class DNSSDNetService {
         lastError = Int(DNSServiceProcessResult(sd))
     }
 
+    /// Publishing or resolving finished successfully or with an error
+    func finished(domain: String? = nil, error e: Any? = nil) {
+        let dict: DNSSDNetService.ErrorDictionary
+        if let domain = domain, let error = e {
+            dict = [
+                DNSSDNetService.errorDomain : domain,
+                DNSSDNetService.errorCode   : error
+            ]
+        } else {
+            dict = errorDictionary
+        }
+        if isResolving {
+            isResolving = false
+            if e == nil && lastError == kDNSServiceErr_NoError {
+                delegate?.netServiceDidResolveAddress(self)
+            } else {
+                delegate?.netService(self, didNotResolve: dict)
+            }
+        }
+        if isPublishing {
+            isPublishing = false
+            if e == nil && lastError == kDNSServiceErr_NoError {
+                delegate?.netServiceDidPublish(self)
+            } else {
+                delegate?.netService(self, didNotPublish: dict)
+            }
+        }
+    }
+
     /// Publish the net service.  This function returns immediately.
     ///
     /// - Parameter options: publishing options
@@ -199,12 +228,9 @@ open class DNSSDNetService {
             if let name = name, let n = String(validatingUTF8: name) { this._name = n }
             if let type = regType, let t = String(validatingUTF8: type) { this._type = t }
             if let domain = domain, let d = String(validatingUTF8: domain) { this._domain = d }
+            this.isPublishing = false
             this.lastError = Int(err)
-            guard this.lastError == kDNSServiceErr_NoError else {
-                this.delegate?.netService(this, didNotPublish: this.errorDictionary)
-                return
-            }
-            this.delegate?.netServiceDidPublish(this)
+            this.finished()
         }, this))
         guard lastError == kDNSServiceErr_NoError else {
             delegate?.netService(self, didNotPublish: errorDictionary)
@@ -251,12 +277,9 @@ open class DNSSDNetService {
             let this = Unmanaged<DNSSDNetService>.fromOpaque(context).takeRetainedValue()
             if let name = name, let n = String(validatingUTF8: name) { this._name = n }
             if let host = host, let h = String(validatingUTF8: host) { this.hostName = h }
+            this.isResolving = false
             this.lastError = Int(err)
-            guard this.lastError == kDNSServiceErr_NoError else {
-                this.delegate?.netService(this, didNotResolve: this.errorDictionary)
-                return
-            }
-            this.delegate?.netServiceDidResolveAddress(this)
+            this.finished()
         }, this))
         guard lastError == kDNSServiceErr_NoError else {
             delegate?.netService(self, didNotResolve: errorDictionary)
@@ -292,22 +315,11 @@ open class DNSSDNetService {
     /// - Parameters:
     ///   - domain: error domain
     ///   - error: error code
-    func cancel(domain: String = DNSSDNetService.netServiceErrorDomain, error: Any = DNSSDNetService.ErrorCode.cancelledError) {
+    func cancel(domain d: String = DNSSDNetService.netServiceErrorDomain, error e: Any = DNSSDNetService.ErrorCode.cancelledError) {
         if let sd = sd {
             DNSServiceRefDeallocate(sd)
             self.sd = nil
-            let dict: DNSSDNetService.ErrorDictionary = [
-                DNSSDNetService.errorDomain : domain,
-                DNSSDNetService.errorCode   : error
-            ]
-            if isResolving {
-                isResolving = false
-                delegate?.netService(self, didNotResolve: dict)
-            }
-            if isPublishing {
-                isPublishing = false
-                delegate?.netService(self, didNotPublish: dict)
-            }
+            finished(domain: d, error: e)
         }
     }
 
