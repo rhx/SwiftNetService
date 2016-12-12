@@ -76,6 +76,8 @@ extension DNSSDNetService {
             let size = MemoryLayout<sockaddr_in>.size
             $0.withMemoryRebound(to: UInt8.self, capacity: size) {
                 let ip4data = CFDataCreate(kCFAllocatorDefault, $0, size)
+                var yes = Int32(1)
+                setsockopt(Int32(CFSocketGetNative(v4socket)), Int32(SOL_SOCKET), Int32(SO_REUSEADDR), &yes, socklen_t(MemoryLayout<Int32>.size))
                 CFSocketSetAddress(v4socket, ip4data)
             }
         }
@@ -86,6 +88,8 @@ extension DNSSDNetService {
                 let size = MemoryLayout<sockaddr_in6>.size
                 $0.withMemoryRebound(to: UInt8.self, capacity: size) {
                     let ip6data = CFDataCreate(kCFAllocatorDefault, $0, size)
+                    var yes = Int32(1)
+                    setsockopt(Int32(CFSocketGetNative(v6socket)), Int32(SOL_SOCKET), Int32(SO_REUSEADDR), &yes, socklen_t(MemoryLayout<Int32>.size))
                     CFSocketSetAddress(v6socket, ip6data)
                 }
             }
