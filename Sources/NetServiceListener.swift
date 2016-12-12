@@ -45,8 +45,13 @@ extension DNSSDNetService {
             let this = Unmanaged<DNSSDNetService>.fromOpaque(info).takeRetainedValue()
             guard let delegate = this.delegate else { return }
             guard let socket = data?.assumingMemoryBound(to: CFSocketNativeHandle.self).pointee else { return }
-            let inputStream = DNSSDNetServiceInputStream(socket)
-            let outputStream = DNSSDNetServiceOutputStream(socket)
+            var readStream: Unmanaged<CFReadStream>?
+            var writeStream: Unmanaged<CFWriteStream>?
+            CFStreamCreatePairWithSocket(kCFAllocatorDefault, socket, &readStream, &writeStream)
+            guard let r = readStream?.takeRetainedValue(),
+                  let w = writeStream?.takeRetainedValue() else { return }
+            let inputStream = DNSSDNetServiceInputStream(r)
+            let outputStream = DNSSDNetServiceOutputStream(w)
             delegate.netService(this, didAcceptConnectionWith: inputStream, outputStream: outputStream)
         }
         let this = Unmanaged.passUnretained(self).toOpaque()
