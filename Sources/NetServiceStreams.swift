@@ -75,6 +75,11 @@ public class DNSSDNetServiceInputStream: InputStream {
     }
 
     public override func open() {
+        #if os(Linux)
+            delegate?.stream?(self, handleEvent: .openCompleted)
+        #else
+            delegate?.stream?(self, handle: .openCompleted)
+        #endif
     }
 
     public override func close() {
@@ -101,10 +106,16 @@ public class DNSSDNetServiceInputStream: InputStream {
         dispatchSource = source
         source.setEventHandler { [weak self] in
             guard let source = self else {
-                print("nil self, bailing out")
+                print("Dispatch read source with nil self, bailing out")
                 return
             }
-            print("Dispatch read source event triggered")
+            if source.hasBytesAvailable {
+                #if os(Linux)
+                    source.delegate?.stream?(source, handleEvent: .hasBytesAvailable)
+                #else
+                    source.delegate?.stream?(source, handle: .hasBytesAvailable)
+                #endif
+            }
         }
         source.resume()
     }
@@ -113,6 +124,7 @@ public class DNSSDNetServiceInputStream: InputStream {
 
 public class DNSSDNetServiceOutputStream: OutputStream {
     var sock: CFSocketNativeHandle
+    var dispatchSource: DispatchSourceWrite?
     var status = Status.open
     var properties = Dictionary<PropertyKey, PropertyValue>()
 
@@ -163,5 +175,34 @@ public class DNSSDNetServiceOutputStream: OutputStream {
         let rv = super.setProperty(property, forKey: key)
         properties[key] = property
         return rv
+    }
+
+    /// Schedule the output stream in the given run loop
+    ///
+    /// - Parameters:
+    ///   - runLoop: needs to be `RunLoop.main`
+    ///   - mode: runloop mode to use (ignored)
+    public override func schedule(in runLoop: RunLoop, forMode mode: RunLoopMode = .defaultRunLoopMode) {
+        guard runLoop == RunLoop.main else {
+            print("Alternate run loops are not supported")
+            return
+        }
+        guard dispatchSource == nil else { return }
+        let source = DispatchSource.makeWriteSource(fileDescriptor: Int32(sock))
+        dispatchSource = source
+        source.setEventHandler { [weak self] in
+            guard let source = self else {
+                print("Dispatch write source with nil self, bailing out")
+                return
+            }
+            if source.hasSpaceAvailable {
+                #if os(Linux)
+                    source.delegate?.stream?(source, handleEvent: .hasSpaceAvailable)
+                #else
+                    source.delegate?.stream?(source, handle: .hasSpaceAvailable)
+                #endif
+            }
+        }
+        source.resume()
     }
 }
