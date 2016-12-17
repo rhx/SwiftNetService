@@ -18,6 +18,11 @@ import Dispatch
     private let utf8 = CFStringBuiltInEncodings.UTF8.rawValue
 #endif
 
+enum SocketError: Error {
+    case eof
+    case error(Int)
+}
+
 extension CFSocketNativeHandle {
     func get(_ buffer: UnsafeMutableRawPointer, maxLength len: Int) -> Int {
         return Int(read(Int32(self), buffer, ssize_t(len)))
@@ -35,9 +40,16 @@ extension CFSocketNativeHandle {
         shutdown(Int32(self), Int32(SHUT_WR))
     }
 
-    func has(events: Int16 = Int16(POLLIN)) -> Bool {
+    func has(events: Int16 = Int16(POLLIN)) throws -> Bool {
         var fd = pollfd(fd: Int32(self), events: events, revents: 0)
-        return poll(&fd, 1, 0) > 0
+        let rv = poll(&fd, 1, 0) > 0
+        if (fd.revents & Int16(POLLERR|POLLNVAL)) != 0 {
+            throw SocketError.error(Int(errno))
+        }
+        if (fd.revents & Int16(POLLHUP)) != 0 {
+            throw SocketError.eof
+        }
+        return rv
     }
 
     func closeAll() {
@@ -71,7 +83,11 @@ public class DNSSDNetServiceInputStream: InputStream {
     }
 
     public override var hasBytesAvailable: Bool {
-        return sock.has(events: Int16(POLLIN))
+        return (try? canRead()) ?? false
+    }
+
+    func canRead() throws -> Bool {
+        return try sock.has(events: Int16(POLLIN))
     }
 
     public override func open() {
@@ -109,11 +125,25 @@ public class DNSSDNetServiceInputStream: InputStream {
                 print("Dispatch read source with nil self, bailing out")
                 return
             }
-            if source.hasBytesAvailable {
+            do {
+                if try source.canRead() {
+                    #if os(Linux)
+                        source.delegate?.stream?(source, handleEvent: .hasBytesAvailable)
+                    #else
+                        source.delegate?.stream?(source, handle: .hasBytesAvailable)
+                    #endif
+                }
+            } catch SocketError.error(_) {
                 #if os(Linux)
-                    source.delegate?.stream?(source, handleEvent: .hasBytesAvailable)
+                    source.delegate?.stream?(source, handleEvent: .errorOccurred)
                 #else
-                    source.delegate?.stream?(source, handle: .hasBytesAvailable)
+                    source.delegate?.stream?(source, handle: .errorOccurred)
+                #endif
+            } catch {
+                #if os(Linux)
+                    source.delegate?.stream?(source, handleEvent: .endEncountered)
+                #else
+                    source.delegate?.stream?(source, handle: .endEncountered)
                 #endif
             }
         }
@@ -152,7 +182,11 @@ public class DNSSDNetServiceOutputStream: OutputStream {
 
     // returns YES if the stream can be written to or if it is impossible to tell without actually doing the write.
     public override var hasSpaceAvailable: Bool {
-        return sock.has(events: Int16(POLLOUT))
+        return (try? canWrite()) ?? false
+    }
+
+    func canWrite() throws -> Bool {
+        return try sock.has(events: Int16(POLLOUT))
     }
 
     public override func open() {
@@ -195,11 +229,25 @@ public class DNSSDNetServiceOutputStream: OutputStream {
                 print("Dispatch write source with nil self, bailing out")
                 return
             }
-            if source.hasSpaceAvailable {
+            do {
+                if try source.canWrite() {
+                    #if os(Linux)
+                        source.delegate?.stream?(source, handleEvent: .hasSpaceAvailable)
+                    #else
+                        source.delegate?.stream?(source, handle: .hasSpaceAvailable)
+                    #endif
+                }
+            } catch SocketError.error(_) {
                 #if os(Linux)
-                    source.delegate?.stream?(source, handleEvent: .hasSpaceAvailable)
+                    source.delegate?.stream?(source, handleEvent: .errorOccurred)
                 #else
-                    source.delegate?.stream?(source, handle: .hasSpaceAvailable)
+                    source.delegate?.stream?(source, handle: .errorOccurred)
+                #endif
+            } catch {
+                #if os(Linux)
+                    source.delegate?.stream?(source, handleEvent: .endEncountered)
+                #else
+                    source.delegate?.stream?(source, handle: .endEncountered)
                 #endif
             }
         }
