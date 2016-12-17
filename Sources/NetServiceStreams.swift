@@ -92,7 +92,7 @@ public class DNSSDNetServiceInputStream: InputStream {
 
     public override func open() {
         #if os(Linux)
-            delegate?.stream?(self, handleEvent: .openCompleted)
+            delegate?.stream(self, handleEvent: .openCompleted)
         #else
             delegate?.stream?(self, handle: .openCompleted)
         #endif
@@ -131,20 +131,20 @@ public class DNSSDNetServiceInputStream: InputStream {
             do {
                 if try source.canRead() {
                     #if os(Linux)
-                        source.delegate?.stream?(source, handleEvent: .hasBytesAvailable)
+                        source.delegate?.stream(source, handleEvent: .hasBytesAvailable)
                     #else
                         source.delegate?.stream?(source, handle: .hasBytesAvailable)
                     #endif
                 }
             } catch SocketError.error(_) {
                 #if os(Linux)
-                    source.delegate?.stream?(source, handleEvent: .errorOccurred)
+                    source.delegate?.stream(source, handleEvent: .errorOccurred)
                 #else
                     source.delegate?.stream?(source, handle: .errorOccurred)
                 #endif
             } catch {
                 #if os(Linux)
-                    source.delegate?.stream?(source, handleEvent: .endEncountered)
+                    source.delegate?.stream(source, handleEvent: .endEncountered)
                 #else
                     source.delegate?.stream?(source, handle: .endEncountered)
                 #endif
@@ -247,20 +247,20 @@ public class DNSSDNetServiceOutputStream: OutputStream {
             do {
                 if try source.canWrite() {
                     #if os(Linux)
-                        source.delegate?.stream?(source, handleEvent: .hasSpaceAvailable)
+                        source.delegate?.stream(source, handleEvent: .hasSpaceAvailable)
                     #else
                         source.delegate?.stream?(source, handle: .hasSpaceAvailable)
                     #endif
                 }
             } catch SocketError.error(_) {
                 #if os(Linux)
-                    source.delegate?.stream?(source, handleEvent: .errorOccurred)
+                    source.delegate?.stream(source, handleEvent: .errorOccurred)
                 #else
                     source.delegate?.stream?(source, handle: .errorOccurred)
                 #endif
             } catch {
                 #if os(Linux)
-                    source.delegate?.stream?(source, handleEvent: .endEncountered)
+                    source.delegate?.stream(source, handleEvent: .endEncountered)
                 #else
                     source.delegate?.stream?(source, handle: .endEncountered)
                 #endif
