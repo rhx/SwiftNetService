@@ -117,7 +117,10 @@ public class DNSSDNetServiceInputStream: InputStream {
             print("Alternate run loops are not supported")
             return
         }
-        guard dispatchSource == nil else { return }
+        if let src = dispatchSource {
+            src.resume()
+            return
+        }
         let source = DispatchSource.makeReadSource(fileDescriptor: Int32(sock))
         dispatchSource = source
         source.setEventHandler { [weak self] in
@@ -148,6 +151,15 @@ public class DNSSDNetServiceInputStream: InputStream {
             }
         }
         source.resume()
+    }
+
+    /// Remove the input stream from the given run loop
+    ///
+    /// - Parameters:
+    ///   - aRunLoop: needs to be `RunLoop.main`
+    ///   - mode: runloop mode to use (ignored)
+    public override func remove(from runLoop: RunLoop, forMode mode: RunLoopMode) {
+        dispatchSource?.suspend()
     }
 }
 
@@ -221,7 +233,10 @@ public class DNSSDNetServiceOutputStream: OutputStream {
             print("Alternate run loops are not supported")
             return
         }
-        guard dispatchSource == nil else { return }
+        if let src = dispatchSource {
+            src.resume()
+            return
+        }
         let source = DispatchSource.makeWriteSource(fileDescriptor: Int32(sock))
         dispatchSource = source
         source.setEventHandler { [weak self] in
@@ -252,5 +267,14 @@ public class DNSSDNetServiceOutputStream: OutputStream {
             }
         }
         source.resume()
+    }
+
+    /// Remove the output stream from the given run loop
+    ///
+    /// - Parameters:
+    ///   - aRunLoop: needs to be `RunLoop.main`
+    ///   - mode: runloop mode to use (ignored)
+    public override func remove(from runLoop: RunLoop, forMode mode: RunLoopMode) {
+        dispatchSource?.suspend()
     }
 }
