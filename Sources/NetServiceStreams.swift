@@ -38,10 +38,15 @@ extension CFSocketNativeHandle {
         var fd = pollfd(fd: Int32(self), events: events, revents: 0)
         return poll(&fd, 1, 0) > 0
     }
+
+    func closeAll() {
+        close(Int32(self))
+    }
 }
 
 public class DNSSDNetServiceInputStream: InputStream {
     var sock: CFSocketNativeHandle
+    var cffd: CFFileDescriptor?
     var status = Status.open
 
     /// Initialise from a `CFSocketNativeHandle`
@@ -50,6 +55,10 @@ public class DNSSDNetServiceInputStream: InputStream {
     public init(_ socket: CFSocketNativeHandle) {
         sock = socket
         super.init(data: Data())
+    }
+
+    deinit {
+        sock.closeAll()
     }
 
     public override func read(_ buffer: UnsafeMutablePointer<UInt8>, maxLength len: Int) -> Int {
@@ -74,6 +83,32 @@ public class DNSSDNetServiceInputStream: InputStream {
 
     public override var streamStatus: Status {
         return status
+    }
+
+    /// Schedule the input stream in the given run loop
+    ///
+    /// - Parameters:
+    ///   - runLoop: the run loop to schedule the stream in
+    ///   - mode: runloop mode to use
+    public override func schedule(in runLoop: RunLoop, forMode mode: RunLoopMode = .defaultRunLoopMode) {
+        guard cffd == nil else { return }
+        let this = Unmanaged.passUnretained(self).toOpaque()
+        var context = CFFileDescriptorContext(version: 0, info: this, retain: {
+            guard let this = $0 else { return $0 }
+            _ = Unmanaged<DNSSDNetService>.fromOpaque(this).retain()
+            return $0
+        }, release: {
+            guard let this = $0 else { return }
+            Unmanaged<DNSSDNetService>.fromOpaque(this).release()
+        }, copyDescription: nil)
+        guard let cf = CFFileDescriptorCreate(nil, CFFileDescriptorNativeDescriptor(sock), false, { (cffd: CFFileDescriptor?, flags: CFOptionFlags, context: UnsafeMutableRawPointer?) in
+            print("InputStream file event: not yet implemented")
+        }, &context) else { return }
+        guard let source = CFFileDescriptorCreateRunLoopSource(nil, cf, 0) else {
+            return
+        }
+        let cfmode = CFRunLoopMode(NSString(string: mode.rawValue) as CFString)
+        CFRunLoopAddSource(runLoop.getCFRunLoop(), source, cfmode)
     }
 }
 
