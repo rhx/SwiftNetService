@@ -99,6 +99,13 @@ public class DNSSDNetServiceInputStream: InputStream {
         guard dispatchSource == nil else { return }
         let source = DispatchSource.makeReadSource(fileDescriptor: Int32(sock))
         dispatchSource = source
+        source.setEventHandler { [weak self] in
+            guard let source = self else {
+                print("nil self, bailing out")
+                return
+            }
+            print("Dispatch read source event triggered")
+        }
         source.resume()
     }
 }
