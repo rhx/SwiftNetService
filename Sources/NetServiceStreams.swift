@@ -7,6 +7,7 @@
 //
 import CoreFoundation
 import Foundation
+import Dispatch
 
 #if os(Linux)
     private let utf8 = CFStringEncoding(kCFStringEncodingUTF8)
@@ -46,7 +47,7 @@ extension CFSocketNativeHandle {
 
 public class DNSSDNetServiceInputStream: InputStream {
     var sock: CFSocketNativeHandle
-    var cffd: CFFileDescriptor?
+    var dispatchSource: DispatchSourceRead?
     var status = Status.open
 
     /// Initialise from a `CFSocketNativeHandle`
@@ -88,27 +89,17 @@ public class DNSSDNetServiceInputStream: InputStream {
     /// Schedule the input stream in the given run loop
     ///
     /// - Parameters:
-    ///   - runLoop: the run loop to schedule the stream in
-    ///   - mode: runloop mode to use
+    ///   - runLoop: needs to be `RunLoop.main`
+    ///   - mode: runloop mode to use (ignored)
     public override func schedule(in runLoop: RunLoop, forMode mode: RunLoopMode = .defaultRunLoopMode) {
-        guard cffd == nil else { return }
-        let this = Unmanaged.passUnretained(self).toOpaque()
-        var context = CFFileDescriptorContext(version: 0, info: this, retain: {
-            guard let this = $0 else { return $0 }
-            _ = Unmanaged<DNSSDNetService>.fromOpaque(this).retain()
-            return $0
-        }, release: {
-            guard let this = $0 else { return }
-            Unmanaged<DNSSDNetService>.fromOpaque(this).release()
-        }, copyDescription: nil)
-        guard let cf = CFFileDescriptorCreate(nil, CFFileDescriptorNativeDescriptor(sock), false, { (cffd: CFFileDescriptor?, flags: CFOptionFlags, context: UnsafeMutableRawPointer?) in
-            print("InputStream file event: not yet implemented")
-        }, &context) else { return }
-        guard let source = CFFileDescriptorCreateRunLoopSource(nil, cf, 0) else {
+        guard runLoop == RunLoop.main else {
+            print("Alternate run loops are not supported")
             return
         }
-        let cfmode = CFRunLoopMode(NSString(string: mode.rawValue) as CFString)
-        CFRunLoopAddSource(runLoop.getCFRunLoop(), source, cfmode)
+        guard dispatchSource == nil else { return }
+        let source = DispatchSource.makeReadSource(fileDescriptor: Int32(sock))
+        dispatchSource = source
+        source.resume()
     }
 }
 
